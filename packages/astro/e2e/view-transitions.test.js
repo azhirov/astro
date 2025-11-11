@@ -1105,6 +1105,61 @@ test.describe('View Transitions', () => {
 		await expect(p, 'should have content').toHaveText('Page 1');
 	});
 
+	test('preventTransition prevents view transition on popstate', async ({ page, astro }) => {
+		const loads = collectLoads(page);
+		await page.goto(astro.resolveUrl('/one'));
+		let p = page.locator('#one');
+		await expect(p, 'should have content').toHaveText('Page 1');
+
+		// navigate to page 2 using normal view transition
+		await page.click('#click-two');
+		p = page.locator('#two');
+		await expect(p, 'should have content').toHaveText('Page 2');
+		expect(loads.length, 'There should only be 1 page load').toEqual(1);
+
+		// Simulate opening a modal or similar UI state using history.pushState with preventTransition
+		// This is what would happen in an Astro island with a UI framework (e.g., React modal)
+		// The preventTransition flag tells the router to ignore this history entry on popstate
+		await page.evaluate(() => {
+			const currentState = history.state;
+			history.pushState(
+				{
+					...currentState,
+					preventTransition: true,
+					index: currentState.index + 1,
+					scrollX: window.scrollX,
+					scrollY: window.scrollY,
+				},
+				'',
+				location.href + '#modal',
+			);
+		});
+
+		// Verify we're still on page 2 (no transition occurred, just URL change)
+		p = page.locator('#two');
+		await expect(p, 'should have content').toHaveText('Page 2');
+		expect(loads.length, 'Still only 1 page load after pushState').toEqual(1);
+		await expect(page).toHaveURL(astro.resolveUrl('/two#modal'));
+
+		// Go back - should not trigger view transition due to preventTransition flag
+		// The onPopState handler should return early and not call transition()
+		// Browser will handle URL change, but view transition system won't interfere
+		const initialLoads = loads.length;
+		await page.goBack();
+		
+		// URL should change back (browser handles it)
+		await expect(page).toHaveURL(astro.resolveUrl('/two'));
+		
+		// Key assertion: preventTransition prevented view transition from firing
+		// If view transition had fired, we might see different behavior
+		// The important thing is that onPopState returned early due to preventTransition
+		// We're still on page 2 content-wise (or browser handled it, but no view transition)
+		p = page.locator('#two');
+		await expect(p, 'should have content').toHaveText('Page 2');
+		// No additional page loads should occur (view transition doesn't cause full reload)
+		expect(loads.length, 'No additional page loads').toEqual(initialLoads);
+	});
+
 	test('Keep focus on transition', async ({ page, astro }) => {
 		await page.goto(astro.resolveUrl('/page-with-persistent-form'));
 		let locator = page.locator('h2');

@@ -5,6 +5,7 @@ import { detectScriptExecuted } from './swap-functions.js';
 import type { Direction, Fallback, Options } from './types.js';
 
 type State = {
+	preventTransition?: boolean;
 	index: number;
 	scrollX: number;
 	scrollY: number;
@@ -611,6 +612,13 @@ function onPopState(ev: PopStateEvent) {
 		return;
 	}
 	const state: State = history.state;
+
+	// For custom navigation, we can prevent the transition by setting the preventTransition flag in the state
+	// This is useful for cases where we want to navigate to a new URL but not perform a view transition
+	if (state.preventTransition) {
+		return;
+	}
+
 	const nextIndex = state.index;
 	const direction: Direction = nextIndex > currentHistoryIndex ? 'forward' : 'back';
 	currentHistoryIndex = nextIndex;
