@@ -1157,7 +1157,21 @@ test.describe('View Transitions', () => {
 		p = page.locator('#two');
 		await expect(p, 'should have content').toHaveText('Page 2');
 		// No additional page loads should occur (view transition doesn't cause full reload)
-		expect(loads.length, 'No additional page loads').toEqual(initialLoads);
+		expect(loads.length, 'No additional page loads after goBack').toEqual(initialLoads);
+
+		// Go forward - should also not trigger view transition due to preventTransition flag
+		// This tests the forward navigation case (e.g., user presses forward button after going back)
+		await page.goForward();
+		
+		// URL should change forward to the state with #modal (browser handles it)
+		await expect(page).toHaveURL(astro.resolveUrl('/two#modal'));
+		
+		// Key assertion: preventTransition also prevents view transition on forward navigation
+		// The onPopState handler should return early for forward navigation too
+		p = page.locator('#two');
+		await expect(p, 'should have content').toHaveText('Page 2');
+		// No additional page loads should occur (view transition doesn't cause full reload)
+		expect(loads.length, 'No additional page loads after goForward').toEqual(initialLoads);
 	});
 
 	test('Keep focus on transition', async ({ page, astro }) => {
